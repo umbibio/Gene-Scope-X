@@ -40,6 +40,8 @@ def get_adata(filename):
     print(filename)
     global adata
     filename = filename[0]
+    if '\\' in filename:
+        filename = filename.replace('\\', '/')
     sc.settings.figdir = filename.rsplit('/', 1)[0] + '/figures/'
     if filename.endswith('h5ad'):
         adata = sc.read(filename)
