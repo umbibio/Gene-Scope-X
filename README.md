@@ -7,18 +7,18 @@ GeneScopeX is a web application that provides a comprehensive and user-friendly 
 4. Move the unzipped assets folder to Source code folder(Gene-Scope-X-1.0.0 folder)
 
 Install the following packages:
-dash
-dash_uploader
-dash_bootstrap_components
-dash_bootstrap_templates
-numpy
-pandas
-matplotlib
-plotly
-scanpy
-anndata
-leidenalg
-opencv-python
-scikit-image
-pathlib
-uuid
+> * dash
+> * dash_uploader
+> * dash_bootstrap_components
+> * dash_bootstrap_templates
+> * numpy
+> * pandas
+> * matplotlib
+> * plotly
+> * scanpy
+> * anndata
+> * leidenalg
+> * opencv-python
+> * scikit-image
+> * pathlib
+> * uuid
