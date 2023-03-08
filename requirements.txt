@@ -1,5 +1,5 @@
 dash
-dash_uploader
+dash_uploader==0.6.0
 dash_bootstrap_components
 dash_bootstrap_templates
 numpy
@@ -13,3 +13,5 @@ opencv-python
 scikit-image
 pathlib
 uuid
+gunicorn
+packaging==21.3
