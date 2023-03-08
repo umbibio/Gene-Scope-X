@@ -1,0 +1,15 @@
+dash
+dash_uploader
+dash_bootstrap_components
+dash_bootstrap_templates
+numpy
+pandas
+matplotlib
+plotly
+scanpy
+anndata
+leidenalg
+opencv-python
+scikit-image
+pathlib
+uuid
