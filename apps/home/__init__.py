@@ -1,2 +1,2 @@
-import apps.home.callbacks
-from apps.home.layouts import *
+from .callbacks import *
+from .layouts import *

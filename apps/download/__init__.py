@@ -1,2 +1,2 @@
-import apps.download.callbacks
-from apps.download.layouts import *
+from .callbacks import *
+from .layouts import *
