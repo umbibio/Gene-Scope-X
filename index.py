@@ -70,4 +70,14 @@ def display_page(pathname):
 
 
 if __name__ == '__main__':
-    app.run_server(host="127.0.0.1", debug=True)
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--host', type=str, default='127.0.0.1')
+    parser.add_argument('--port', type=int, default=8050)
+    parser.add_argument('--debug', action='store_true')
+    
+    kvargs = vars(parser.parse_args())
+
+    app.run_server(**kvargs)
+
