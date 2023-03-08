@@ -1,0 +1,6 @@
+__pycache__
+*.DS_Store
+*.zip
+*.h5ad
+*.h5
+assets
