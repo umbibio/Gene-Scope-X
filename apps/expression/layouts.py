@@ -55,12 +55,12 @@ menu = [
                   html.Button("Automatic Clustering", id="auto-cluster-button"),
                   html.Br(), html.Br(),
                   html.Button("Manual Clustering", id="manual-cluster-button"),], style={'display': 'none'}),
-              html.Div(id='manual-cluster-div', style={'display': 'none'}, children =[
+              dbc.Spinner([html.Div(id='manual-cluster-div', style={'display': 'none'}, children =[
                             html.Button("Add Cluster", id="add-cluster", n_clicks=0),
                             html.Div(id='cluster-container', children=[]),
                             dcc.Store(id='manual-cluster-dict'),
                             html.Br(),
-                            html.Button("Compare", id="compare-button")]),
+                            html.Button("Compare", id="compare-button")]),], type='border', fullscreen=False, color='primary', delay_hide=100,),
               html.Div(id='visualization-div', style={'display': 'none'}, children=[
                         html.Button("Download Differential Gene Expression", id="download-button"),
                         dcc.Download(id="download"),
