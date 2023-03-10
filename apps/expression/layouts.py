@@ -35,10 +35,12 @@ menu = [
                   html.Button("OK", id="preprocessing-button"),
               ], style={'display': 'none'}),])], type='border', fullscreen=False, color='primary', delay_hide=100,),
               dcc.Store(id='adata-path'),
+              dcc.Store(id='session-id'),
               dcc.Store(id='genes'),
               dcc.Store(id='obsmdf'),
               dcc.Store(id='clustertype'),
               dcc.Store(id='grouplen'),
+              dcc.Store(id='manual-cluster-dict'),
               html.Div(id = 'scatter-plot', children = [
                   html.Div(id='scatter-plot-div', children = [html.P("Type: "),
                     dcc.Dropdown(id='type',options=['PCA', 'UMAP'], value='PCA'),
@@ -58,7 +60,6 @@ menu = [
               dbc.Spinner([html.Div(id='manual-cluster-div', style={'display': 'none'}, children =[
                             html.Button("Add Cluster", id="add-cluster", n_clicks=0),
                             html.Div(id='cluster-container', children=[]),
-                            dcc.Store(id='manual-cluster-dict'),
                             html.Br(),
                             html.Button("Compare", id="compare-button")]),], type='border', fullscreen=False, color='primary', delay_hide=100,),
               html.Div(id='visualization-div', style={'display': 'none'}, children=[

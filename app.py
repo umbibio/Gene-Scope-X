@@ -25,6 +25,6 @@ app = dash.Dash(
     external_stylesheets=[getattr(dbc.themes, theme.upper()), dbc.icons.BOOTSTRAP],
     url_base_pathname=url_base_pathname,
     suppress_callback_exceptions=True,
-    title='Single Cell RNA Sequencing', update_title='Loading...')
+    title='GeneScopeX', update_title='Loading...')
 
 server = app.server

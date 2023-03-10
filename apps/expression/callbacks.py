@@ -21,6 +21,7 @@ du.configure_upload(app, UPLOAD_FOLDER_ROOT)
 
 @du.callback(
     [Output('adata-path', 'data'),
+    Output('session-id', 'data'),
     Output('preprocessing-div', 'style'),
     Output('dash-uploader','disabled'),
     Output('dash-uploader','disabledMessage')],
@@ -32,7 +33,6 @@ def get_adata(filename):
     if '\\' in filename:
         filename = filename.replace('\\', '/')
     foldarpath = filename.rsplit('/', 1)[0]
-    sc.settings.figdir =  foldarpath + '/figures/'
     if filename.endswith('h5ad'):
         adata = sc.read(filename)
         adata.write(foldarpath+'/adata.h5ad')
@@ -47,7 +47,7 @@ def get_adata(filename):
     elif filename.endswith('h5'):
         adata = sc.read_10x_h5(filename)
         adata.write(foldarpath + '/adata.h5ad')
-    return foldarpath + '/adata.h5ad',{'display': 'block'}, True, 'Uploaded: '+filename.rsplit('/', 1)[1]
+    return foldarpath + '/adata.h5ad', filename.split('/')[1], {'display': 'block'}, True, 'Uploaded: '+filename.rsplit('/', 1)[1]
 
 @app.callback(
     Output('genes', 'data'),
@@ -101,7 +101,8 @@ def update_2d3d_visibility(type):
               Output('violinplot-radio-buttons', 'style'),
               Output('clustertype', 'data'),
               Output('grouplen', 'data'),],
-              [State('adata-path', 'data'),
+              [State('session-id', 'data'),
+              State('adata-path', 'data'),
               State('clustertype', 'data'),
               State('obsmdf', 'data'),
               State('grouplen', 'data'),
@@ -117,7 +118,7 @@ def update_2d3d_visibility(type):
               State('2d3d-radio', 'value'),
               State('manual-cluster-dict','data'),
               State('genes','data')])
-def scatter_plot(adata_path, clustertype, obsmdf, grouplen, scatter_plot, autocluster_plot,manualcluster_plot, comparebutton, visualization_plot,  type, gene, plotComboBox, n_genes, pca_radio, manual_cluster_dict, genes):
+def scatter_plot(session_id, adata_path, clustertype, obsmdf, grouplen, scatter_plot, autocluster_plot,manualcluster_plot, comparebutton, visualization_plot,  type, gene, plotComboBox, n_genes, pca_radio, manual_cluster_dict, genes):
     if ctx.triggered_id == None:
         return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
     listedTimestamps = [scatter_plot, autocluster_plot, manualcluster_plot, comparebutton, visualization_plot]
@@ -173,11 +174,11 @@ def scatter_plot(adata_path, clustertype, obsmdf, grouplen, scatter_plot, autocl
         grouplen = len(adata.obs['leiden'].value_counts())
         sc.set_figure_params(dpi_save=200 ,figsize=(10,7), fontsize=10)
         if type == 'PCA':
-            sc.pl.pca(adata, color='leiden', show=False, save='.png', size=100)
-            image_path = str(sc.settings.figdir)+'/pca.png'
+            sc.pl.pca(adata, color='leiden', show=False, save=session_id+'.png', size=100)
+            image_path = str(sc.settings.figdir)+'/pca'+session_id+'.png'
         elif type == 'UMAP':
-            sc.pl.umap(adata, color='leiden', show=False, save='.png', size=100)
-            image_path = str(sc.settings.figdir)+'/umap.png'
+            sc.pl.umap(adata, color='leiden', show=False, save=session_id+'.png', size=100)
+            image_path = str(sc.settings.figdir)+'/umap'+session_id+'.png'
         sc.tl.rank_genes_groups(adata, groupby='leiden', method='wilcoxon', key_added='wilcoxon')
         sc.tl.dendrogram(adata, 'leiden')
         adata.write(adata_path)
@@ -196,11 +197,12 @@ def scatter_plot(adata_path, clustertype, obsmdf, grouplen, scatter_plot, autocl
         grouplen = len(adata.obs['leiden'].value_counts())
         sc.set_figure_params(dpi_save=200, figsize=(10, 7), fontsize=10)
         if type == 'PCA':
-            sc.pl.pca(adata, color='leiden', show=False, save='.png', size=100)
-            image_path = str(sc.settings.figdir) + '/pca.png'
+            sc.pl.pca(adata, color='leiden', show=False, save=session_id+'.png', size=100)
+            image_path = str(sc.settings.figdir) + '/pca'+session_id+'.png'
         elif type == 'UMAP':
-            sc.pl.umap(adata, color='leiden', show=False, save='.png', size=100)
-            image_path = str(sc.settings.figdir) + '/umap.png'
+            sc.pl.umap(adata, color='leiden', show=False, save=session_id+'.png', size=100)
+            image_path = str(sc.settings.figdir) + '/umap'+session_id+'.png'
+        print('Executing differential gene analysis...')
         sc.tl.rank_genes_groups(adata, groupby='leiden', method='wilcoxon', key_added='wilcoxon')
         sc.tl.dendrogram(adata, 'leiden')
         adata.write(adata_path)
@@ -215,43 +217,43 @@ def scatter_plot(adata_path, clustertype, obsmdf, grouplen, scatter_plot, autocl
         if n_genes is None:
             n_genes = 5
         if plotComboBox == 'Dendrogram':
-            sc.pl.dendrogram(adata, 'leiden', show=False, save='.png')
-            image_path = str(sc.settings.figdir)+'/dendrogram.png'
+            sc.pl.dendrogram(adata, 'leiden', show=False, save=session_id+'.png')
+            image_path = str(sc.settings.figdir)+'/dendrogram'+session_id+'.png'
         elif plotComboBox == 'Gene Ranking':
-            sc.pl.rank_genes_groups(adata, n_genes=n_genes, sharey=False, key='wilcoxon', show=False, save='.png')
-            image_path = str(sc.settings.figdir)+'/rank_genes_groups_leiden.png'
+            sc.pl.rank_genes_groups(adata, n_genes=n_genes, sharey=False, key='wilcoxon', show=False, save=session_id+'.png')
+            image_path = str(sc.settings.figdir)+'/rank_genes_groups_leiden'+session_id+'.png'
         elif plotComboBox == 'Dot Plot':
             sc.pl.rank_genes_groups_dotplot(adata, n_genes=n_genes, key='wilcoxon', groupby='leiden', dendrogram=False,
-                                            show=False, save='.png')
-            image_path = str(sc.settings.figdir)+'/dotplot_.png'
+                                            show=False, save=session_id+'.png')
+            image_path = str(sc.settings.figdir)+'/dotplot_'+session_id+'.png'
         elif plotComboBox == 'Violin':
             return {}, {'display': 'none'}, {'display': 'block'}, {'display': 'block'}, clustertype, grouplen
         elif plotComboBox == 'Stacked Violin':
             sc.pl.rank_genes_groups_stacked_violin(adata, n_genes=n_genes, key='wilcoxon', groupby='leiden', show=False,
-                                                   save='.png', dendrogram=False)
-            image_path = str(sc.settings.figdir)+'/stacked_violin_.png'
+                                                   save=session_id+'.png', dendrogram=False)
+            image_path = str(sc.settings.figdir)+'/stacked_violin_'+session_id+'.png'
         elif plotComboBox == 'Matrix Plot':
             sc.pl.rank_genes_groups_matrixplot(adata, n_genes=n_genes, key='wilcoxon', groupby='leiden', show=False,
-                                               save='.png', dendrogram=False)
-            image_path = str(sc.settings.figdir)+'/matrixplot_.png'
+                                               save=session_id+'.png', dendrogram=False)
+            image_path = str(sc.settings.figdir)+'/matrixplot_'+session_id+'.png'
         elif plotComboBox == 'Heatmap':
             if clustertype == "auto":
                 sc.pl.rank_genes_groups_heatmap(adata, n_genes=n_genes, key='wilcoxon', groupby='leiden',
-                                            show_gene_labels=True, show=False, save='.png', dendrogram=False)
+                                            show_gene_labels=True, show=False, save=session_id+'.png', dendrogram=False)
             elif clustertype == "manual":
                 adata_sub = adata[adata.obs['leiden'].isin(adata.obs['leiden'].dropna().sort_values().unique()),:]
                 sc.pl.rank_genes_groups_heatmap(adata_sub, n_genes=n_genes, key='wilcoxon', groupby='leiden',
-                                                show_gene_labels=True, show=False, save='.png', dendrogram=False)
-            image_path = str(sc.settings.figdir)+'/heatmap.png'
+                                                show_gene_labels=True, show=False, save=session_id+'.png', dendrogram=False)
+            image_path = str(sc.settings.figdir)+'/heatmap'+session_id+'.png'
         elif plotComboBox == 'Tracksplot':
             if clustertype == "auto":
                 sc.pl.rank_genes_groups_tracksplot(adata, n_genes=n_genes, key='wilcoxon', groupby='leiden', show=False,
-                                               save='.png', dendrogram=False)
+                                               save=session_id+'.png', dendrogram=False)
             elif clustertype == "manual":
                 adata_sub = adata[adata.obs['leiden'].isin(adata.obs['leiden'].dropna().sort_values().unique()), :]
                 sc.pl.rank_genes_groups_tracksplot(adata_sub, n_genes=n_genes, key='wilcoxon', groupby='leiden',
-                                                show_gene_labels=True, show=False, save='.png', dendrogram=False)
-            image_path = str(sc.settings.figdir)+'/tracksplot.png'
+                                                show_gene_labels=True, show=False, save=session_id+'.png', dendrogram=False)
+            image_path = str(sc.settings.figdir)+'/tracksplot'+session_id+'.png'
         plotly_fig = px.imshow(io.imread(image_path))
         plotly_fig.update_xaxes(visible=False)
         plotly_fig.update_yaxes(visible=False)
@@ -262,16 +264,17 @@ def scatter_plot(adata_path, clustertype, obsmdf, grouplen, scatter_plot, autocl
 @app.callback(Output('violinplot-radio-buttons', 'children'),
               Output('violin-graph', 'style'),
               Output('expression-graph', 'style'),
+              State('session-id', 'data'),
               State('adata-path', 'data'),
               Input('plotComboBox', 'value'),
               Input('visualization-plot-button','n_clicks'),
               State('n_genes', 'value'))
-def violin_plot(adata_path, plotComboBox, visualization_plot_button, n_genes):
+def violin_plot(session_id, adata_path, plotComboBox, visualization_plot_button, n_genes):
     if ctx.triggered_id == 'visualization-plot-button' and plotComboBox == 'Violin':
         adata = sc.read(adata_path)
         if n_genes is None:
             n_genes = 5
-        sc.pl.rank_genes_groups_violin(adata, n_genes=n_genes, key='wilcoxon', show=False, save='.png')
+        sc.pl.rank_genes_groups_violin(adata, n_genes=n_genes, key='wilcoxon', show=False, save=session_id+'.png')
         return [dbc.RadioItems(id='dimred-radio',
             options=[{'label': x, 'value': x} for x in adata.obs['leiden'].dropna().sort_values().unique()],
             value=adata.obs['leiden'].dropna().sort_values().unique()[0],
@@ -280,9 +283,10 @@ def violin_plot(adata_path, plotComboBox, visualization_plot_button, n_genes):
         return [], {'display': 'none'}, {'display': 'block'}
 
 @app.callback(Output('violin-graph', 'figure'),
+              State('session-id', 'data'),
               Input('dimred-radio', 'value'))
-def violin_plot(dimred_radio):
-    image_path = str(sc.settings.figdir)+'/rank_genes_groups_leiden_'+str(dimred_radio)+'.png'
+def violin_plot(session_id, dimred_radio):
+    image_path = str(sc.settings.figdir)+'/rank_genes_groups_leiden_'+str(dimred_radio)+session_id+'.png'
     plotly_fig = px.imshow(io.imread(image_path))
     plotly_fig.update_xaxes(visible=False)
     plotly_fig.update_yaxes(visible=False)
