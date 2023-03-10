@@ -6,7 +6,7 @@ from dash_bootstrap_templates import load_figure_template
 # import data.csv_db as db
 # import data.sql_db as db
 
-url_base_pathname = '/rnasequencing/'
+url_base_pathname = '/genescopex/'
 # url_base_pathname = '/'
 
 ###################

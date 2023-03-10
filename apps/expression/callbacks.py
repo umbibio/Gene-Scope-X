@@ -3,7 +3,6 @@ from pathlib import Path
 import scanpy as sc
 import dash
 import pandas as pd
-import anndata as anndata
 from dash.dependencies import Input, Output, State
 import dash_bootstrap_components as dbc
 from app import app
@@ -19,57 +18,54 @@ import matplotlib
 matplotlib.pyplot.switch_backend('Agg')
 UPLOAD_FOLDER_ROOT = r"Uploads"
 du.configure_upload(app, UPLOAD_FOLDER_ROOT)
-adata = anndata.AnnData(
-    X=None,
-    obs=None,
-    var=None)
-genes = pd.DataFrame()
-obsmdf = pd.DataFrame()
-dfadata = pd.DataFrame()
-grouplen = 0
-selectedArray = []
-clustertype = ""
 
 @du.callback(
-    [Output('preprocessing-div', 'style'),
+    [Output('adata-path', 'data'),
+    Output('preprocessing-div', 'style'),
     Output('dash-uploader','disabled'),
     Output('dash-uploader','disabledMessage')],
     id='dash-uploader',
 )
 def get_adata(filename):
     print(filename)
-    global adata
     filename = filename[0]
     if '\\' in filename:
         filename = filename.replace('\\', '/')
-    sc.settings.figdir = filename.rsplit('/', 1)[0] + '/figures/'
+    foldarpath = filename.rsplit('/', 1)[0]
+    sc.settings.figdir =  foldarpath + '/figures/'
     if filename.endswith('h5ad'):
         adata = sc.read(filename)
+        adata.write(foldarpath+'/adata.h5ad')
     elif filename.endswith('zip'):
         with ZipFile(filename, 'r') as zip:
-            zip.extractall(filename.rsplit('/', 1)[0])
+            zip.extractall(foldarpath)
         adata = sc.read_10x_mtx(
             Path(filename.replace('.zip','')),
             var_names='gene_symbols',
             cache=False)
+        adata.write(foldarpath + '/adata.h5ad')
     elif filename.endswith('h5'):
         adata = sc.read_10x_h5(filename)
-    return {'display': 'block'}, True, 'Uploaded: '+filename.rsplit('/', 1)[1]
+        adata.write(foldarpath + '/adata.h5ad')
+    return foldarpath + '/adata.h5ad',{'display': 'block'}, True, 'Uploaded: '+filename.rsplit('/', 1)[1]
 
 @app.callback(
+    Output('genes', 'data'),
+    Output('obsmdf', 'data'),
     Output('adata-div','style'),
     Output('gene', 'options'),
     Output('gene', 'value'),
     Output('scatter-plot', 'style'),
+    State('adata-path', 'data'),
     Input('preprocessing-button','n_clicks'),
     State('svd_solver','value'),
     State('n_neighbors','value'),
     State('scatter-plot-div', 'children'))
-def preprocess_adata(n, svd_solver, n_neighbors, children):
+def preprocess_adata(adata_path, n, svd_solver, n_neighbors, children):
     if n is None:
         return dash.no_update
     else:
-        global genes, obsmdf, dfadata
+        adata = sc.read(adata_path)
         print("Preprocessing annData file...")
         adata.var_names_make_unique()
         print("Normalize annData file...")
@@ -83,13 +79,11 @@ def preprocess_adata(n, svd_solver, n_neighbors, children):
         sc.pp.neighbors(adata, n_neighbors=n_neighbors, knn=True, n_pcs=40)
         print("Uniform Manifold Approximation and Projection for Dimension Reduction...")
         sc.tl.umap(adata)
-        adata.uns['log1p']["base"] = None
+        adata.write(adata_path)
         obsmdf = adata.obsm.to_df()
-        dfadata = adata.to_df()
         genes = pd.DataFrame(adata.var.gene_ids)
         gene_ids = genes['gene_ids'].to_numpy()
-        # children.append(dcc.Dropdown(id='gene',options=gene_ids,value=gene_ids[0]))
-    return {'display': 'none'}, gene_ids, gene_ids[0],{'display': 'block'}
+    return genes.to_json(), obsmdf.to_json(), {'display': 'none'}, gene_ids, gene_ids[0], {'display': 'block'}
 
 @app.callback(
     Output('2d3d-radio', 'style'),
@@ -104,8 +98,14 @@ def update_2d3d_visibility(type):
 @app.callback([Output('expression-graph', 'figure'),
               Output('cluster-option-div', 'style'),
               Output('visualization-div', 'style'),
-              Output('violinplot-radio-buttons', 'style'),],
-              [Input('plot-button', 'n_clicks_timestamp'),
+              Output('violinplot-radio-buttons', 'style'),
+              Output('clustertype', 'data'),
+              Output('grouplen', 'data'),],
+              [State('adata-path', 'data'),
+              State('clustertype', 'data'),
+              State('obsmdf', 'data'),
+              State('grouplen', 'data'),
+              Input('plot-button', 'n_clicks_timestamp'),
               Input('auto-cluster-button','n_clicks_timestamp'),
               Input('manual-cluster-button','n_clicks_timestamp'),
               Input('compare-button','n_clicks_timestamp'),
@@ -114,14 +114,16 @@ def update_2d3d_visibility(type):
               State('gene', 'value'),
               State('plotComboBox', 'value'),
               State('n_genes', 'value'),
-              State('2d3d-radio', 'value')])
-def scatter_plot(scatter_plot, autocluster_plot,manualcluster_plot, comparebutton, visualization_plot,  type, gene, plotComboBox, n_genes, pca_radio):
+              State('2d3d-radio', 'value'),
+              State('manual-cluster-dict','data'),
+              State('genes','data')])
+def scatter_plot(adata_path, clustertype, obsmdf, grouplen, scatter_plot, autocluster_plot,manualcluster_plot, comparebutton, visualization_plot,  type, gene, plotComboBox, n_genes, pca_radio, manual_cluster_dict, genes):
     if ctx.triggered_id == None:
-        return dash.no_update, dash.no_update, dash.no_update, dash.no_update
-    global xaxis, yaxis, clustertype, grouplen
+        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
     listedTimestamps = [scatter_plot, autocluster_plot, manualcluster_plot, comparebutton, visualization_plot]
     listedTimestamps = [0 if v is None else v for v in listedTimestamps]
     sortedTimestamps = sorted(listedTimestamps)
+    obsmdf = pd.read_json(obsmdf)
     pickedButton=""
     if scatter_plot == sortedTimestamps[-1]:
         pickedButton = "scatter_plot"
@@ -134,12 +136,13 @@ def scatter_plot(scatter_plot, autocluster_plot,manualcluster_plot, comparebutto
     if visualization_plot == sortedTimestamps[-1]:
         pickedButton = "visualization_plot"
     if pickedButton == "scatter_plot" or pickedButton == "manualcluster_plot":
-        adata.obs['leiden'] = None
+        clustertype = ""
+        adata = sc.read(adata_path)
+        dfadata = adata.to_df()
+        genes = pd.read_json(genes)
         genename = genes.index[genes['gene_ids'] == gene].tolist()[0]
         if type == 'PCA' and pca_radio == '2D':
             fig = px.scatter(x = obsmdf.X_pca1, y = obsmdf.X_pca2,labels={'x':'PC1', 'y':'PC2'}, template="simple_white", title=genename, color=dfadata[genename])
-            xaxis = 'X_pca1'
-            yaxis = 'X_pca2'
         elif type == 'PCA' and pca_radio == '3D':
             fig = px.scatter_3d(x=obsmdf.X_pca1, y=obsmdf.X_pca2,z=obsmdf.X_pca3, labels={'x': 'PC1', 'y': 'PC2', 'z': 'PC3'}, template="simple_white",
                              title=genename, color=dfadata[genename])
@@ -148,12 +151,8 @@ def scatter_plot(scatter_plot, autocluster_plot,manualcluster_plot, comparebutto
                                          yaxis=dict(showgrid=True),
                                          zaxis=dict(showgrid=True)
                                          ))
-            xaxis = 'X_pca1'
-            yaxis = 'X_pca2'
         elif type == 'UMAP':
             fig = px.scatter(x = obsmdf.X_umap1, y = obsmdf.X_umap2,labels={'x':'UMAP1', 'y':'UMAP2'}, template="simple_white", title=genename, color=dfadata[genename])
-            xaxis = 'X_umap1'
-            yaxis = 'X_umap2'
         figure = go.Figure(data = fig)
         if pickedButton == "manualcluster_plot":
             clustertype = "manual"
@@ -161,12 +160,14 @@ def scatter_plot(scatter_plot, autocluster_plot,manualcluster_plot, comparebutto
                 fig = px.scatter(x=obsmdf.X_pca1, y=obsmdf.X_pca2, labels={'x': 'PC1', 'y': 'PC2'},
                                  template="simple_white", title=genename, color=dfadata[genename])
                 figure = go.Figure(data=fig)
-                return figure, {'display': 'none'}, {'display': 'none'}, {'display': 'none'}
+                return figure, {'display': 'none'}, {'display': 'none'}, {'display': 'none'}, clustertype, grouplen
             else:
-                return figure, {'display': 'none'}, {'display': 'none'}, {'display': 'none'}
-        return figure, {'display': 'block'}, {'display': 'none'}, {'display': 'none'}
+                return figure, {'display': 'none'}, {'display': 'none'}, {'display': 'none'}, clustertype, grouplen
+        return figure, {'display': 'block'}, {'display': 'none'}, {'display': 'none'}, clustertype, grouplen
     elif pickedButton == "autocluster_plot":
+        adata = sc.read(adata_path)
         clustertype = "auto"
+        adata.uns['log1p']["base"] = None
         adata.obs['leiden'] = None
         sc.tl.leiden(adata)
         grouplen = len(adata.obs['leiden'].value_counts())
@@ -179,13 +180,19 @@ def scatter_plot(scatter_plot, autocluster_plot,manualcluster_plot, comparebutto
             image_path = str(sc.settings.figdir)+'/umap.png'
         sc.tl.rank_genes_groups(adata, groupby='leiden', method='wilcoxon', key_added='wilcoxon')
         sc.tl.dendrogram(adata, 'leiden')
+        adata.write(adata_path)
         plotly_fig = px.imshow(io.imread(image_path))
         plotly_fig.update_xaxes(visible=False)
         plotly_fig.update_yaxes(visible=False)
         plotly_fig.update_traces(hovertemplate = None,hoverinfo = 'skip')
         plotly_fig.update_layout(width=1100,height=700, template="simple_white")
-        return plotly_fig, {'display': 'none'}, {'display': 'block'}, {'display': 'none'}
+        return plotly_fig, {'display': 'none'}, {'display': 'block'}, {'display': 'none'}, clustertype, grouplen
     elif pickedButton == "comparebutton":
+        adata = sc.read(adata_path)
+        adata.uns['log1p']["base"] = None
+        adata.obs['leiden'] = None
+        for key in manual_cluster_dict.keys():
+            adata.obs.loc[key, 'leiden'] = manual_cluster_dict[key]
         grouplen = len(adata.obs['leiden'].value_counts())
         sc.set_figure_params(dpi_save=200, figsize=(10, 7), fontsize=10)
         if type == 'PCA':
@@ -196,13 +203,15 @@ def scatter_plot(scatter_plot, autocluster_plot,manualcluster_plot, comparebutto
             image_path = str(sc.settings.figdir) + '/umap.png'
         sc.tl.rank_genes_groups(adata, groupby='leiden', method='wilcoxon', key_added='wilcoxon')
         sc.tl.dendrogram(adata, 'leiden')
+        adata.write(adata_path)
         plotly_fig = px.imshow(io.imread(image_path))
         plotly_fig.update_xaxes(visible=False)
         plotly_fig.update_yaxes(visible=False)
         plotly_fig.update_traces(hovertemplate=None, hoverinfo='skip')
         plotly_fig.update_layout(width=1100, height=700, template="simple_white")
-        return plotly_fig, {'display': 'none'}, {'display': 'block'}, {'display': 'none'}
+        return plotly_fig, {'display': 'none'}, {'display': 'block'}, {'display': 'none'}, clustertype, grouplen
     elif pickedButton == "visualization_plot":
+        adata = sc.read(adata_path)
         if n_genes is None:
             n_genes = 5
         if plotComboBox == 'Dendrogram':
@@ -216,7 +225,7 @@ def scatter_plot(scatter_plot, autocluster_plot,manualcluster_plot, comparebutto
                                             show=False, save='.png')
             image_path = str(sc.settings.figdir)+'/dotplot_.png'
         elif plotComboBox == 'Violin':
-            return {}, {'display': 'none'}, {'display': 'block'}, {'display': 'block'}
+            return {}, {'display': 'none'}, {'display': 'block'}, {'display': 'block'}, clustertype, grouplen
         elif plotComboBox == 'Stacked Violin':
             sc.pl.rank_genes_groups_stacked_violin(adata, n_genes=n_genes, key='wilcoxon', groupby='leiden', show=False,
                                                    save='.png', dendrogram=False)
@@ -248,16 +257,18 @@ def scatter_plot(scatter_plot, autocluster_plot,manualcluster_plot, comparebutto
         plotly_fig.update_yaxes(visible=False)
         plotly_fig.update_traces(hovertemplate=None, hoverinfo='skip')
         plotly_fig.update_layout(width=1100, height=700, template="simple_white")
-        return plotly_fig, {'display': 'none'}, {'display': 'block'}, {'display': 'none'}
+        return plotly_fig, {'display': 'none'}, {'display': 'block'}, {'display': 'none'}, clustertype, grouplen
 
 @app.callback(Output('violinplot-radio-buttons', 'children'),
               Output('violin-graph', 'style'),
               Output('expression-graph', 'style'),
+              State('adata-path', 'data'),
               Input('plotComboBox', 'value'),
               Input('visualization-plot-button','n_clicks'),
               State('n_genes', 'value'))
-def violin_plot(plotComboBox, visualization_plot_button, n_genes):
+def violin_plot(adata_path, plotComboBox, visualization_plot_button, n_genes):
     if ctx.triggered_id == 'visualization-plot-button' and plotComboBox == 'Violin':
+        adata = sc.read(adata_path)
         if n_genes is None:
             n_genes = 5
         sc.pl.rank_genes_groups_violin(adata, n_genes=n_genes, key='wilcoxon', show=False, save='.png')
@@ -280,12 +291,16 @@ def violin_plot(dimred_radio):
     return plotly_fig
 
 @app.callback(Output("download", "data"),
+              State('adata-path', 'data'),
+              State('clustertype', 'data'),
               Input('download-button','n_clicks'),
-              State({'type': 'cluster-name','index': ALL}, 'value'))
-def differential_gene_download(n, clustername):
+              State({'type': 'cluster-name','index': ALL}, 'value'),
+              State('grouplen', 'data'),)
+def differential_gene_download(adata_path,clustertype, n, clustername, grouplen):
     if n is None:
         return dash.no_update
     else:
+        adata = sc.read(adata_path)
         df = pd.DataFrame()
         if clustertype == "manual":
             for group in clustername:
@@ -306,9 +321,10 @@ def differential_gene_download(n, clustername):
 @app.callback(
     Output('manual-cluster-div','style'),
     Input('manual-cluster-button','n_clicks'),
-    Input('compare-button','n_clicks'),)
-def manual_clustering(n, compare):
-    if ctx.triggered_id == 'compare-button':
+    Input('compare-button','n_clicks'),
+    Input('plot-button', 'n_clicks'),)
+def manual_clustering(n, compare, plot_button):
+    if ctx.triggered_id == 'compare-button' or ctx.triggered_id == 'plot-button':
         return {'display': 'none'}
     elif ctx.triggered_id == 'manual-cluster-button':
         return {'display': 'block'}
@@ -333,16 +349,28 @@ def display_dropdowns(n_clicks, children):
     return children
 
 @app.callback(
-    Output('dropdown-container-output', 'children'),
+    Output('manual-cluster-dict', 'data'),
+    State('manual-cluster-dict','data'),
+    State('obsmdf', 'data'),
     State('expression-graph', 'selectedData'),
     Input({'type': 'ok-button','index': ALL}, 'n_clicks'),
-    State({'type': 'cluster-name','index': ALL}, 'value')
+    State({'type': 'cluster-name','index': ALL}, 'value'),
+    State('type','value'),
 )
-def display_output(selectedData,n_clicks, clustername):
+def display_output(manual_cluster_dict,obsmdf, selectedData,n_clicks, clustername, type):
     if not any(None in trigg.values() for trigg in ctx.triggered):
         clusterCategory = pd.Series(data=(str(x) for x in clustername), dtype='category')
+        obsmdf = pd.read_json(obsmdf)
+        if manual_cluster_dict == None:
+            manual_cluster_dict = {}
+        if type == 'PCA':
+            xaxis = 'X_pca1'
+            yaxis = 'X_pca2'
+        elif type == 'UMAP':
+            xaxis = 'X_umap1'
+            yaxis = 'X_umap2'
         if selectedData['points']:
             for point in selectedData['points']:
                 selectedGene = obsmdf.index[(obsmdf[xaxis] == point['x']) & (obsmdf[yaxis] == point['y'])][0]
-                adata.obs.loc[selectedGene, 'leiden'] = clusterCategory[json.loads(ctx.triggered[0]['prop_id'].replace('.n_clicks',''))['index']]
-    return dash.no_update
+                manual_cluster_dict[selectedGene] = clusterCategory[json.loads(ctx.triggered[0]['prop_id'].replace('.n_clicks',''))['index']]
+    return manual_cluster_dict
