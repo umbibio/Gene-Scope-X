@@ -33,7 +33,7 @@ menu = [
                   dcc.Input(id="n_neighbors", type="number"),
                   html.Br(), html.Br(),
                   html.Button("OK", id="preprocessing-button"),
-              ], style={'display': 'none'}),])], type='border', fullscreen=False, color='primary', delay_hide=100,),
+              ], style={'display': 'none'}),])],id='adata-div-spinner', spinner_style={'display': 'none'}, type='border', fullscreen=False, color='primary', delay_hide=100,),
               dcc.Store(id='adata-path'),
               dcc.Store(id='session-id'),
               dcc.Store(id='genes'),
@@ -41,6 +41,7 @@ menu = [
               dcc.Store(id='clustertype'),
               dcc.Store(id='grouplen'),
               dcc.Store(id='manual-cluster-dict'),
+              html.Div(id = 'progress-text'),
               html.Div(id = 'scatter-plot', children = [
                   html.Div(id='scatter-plot-div', children = [html.P("Type: "),
                     dcc.Dropdown(id='type',options=['PCA', 'UMAP'], value='PCA'),
@@ -61,7 +62,7 @@ menu = [
                             html.Button("Add Cluster", id="add-cluster", n_clicks=0),
                             html.Div(id='cluster-container', children=[]),
                             html.Br(),
-                            html.Button("Compare", id="compare-button")]),], type='border', fullscreen=False, color='primary', delay_hide=100,),
+                            html.Button("Compare", id="compare-button")]),],id='manual-cluster-div-spinner', spinner_style={'display': 'none'}, type='border', fullscreen=False, color='primary', delay_hide=100,),
               html.Div(id='visualization-div', style={'display': 'none'}, children=[
                         html.Button("Download Differential Gene Expression", id="download-button"),
                         dcc.Download(id="download"),

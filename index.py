@@ -14,6 +14,7 @@ pages = [
     {'title': 'Home', 'app': 'home', 'href': f'{url_base_pathname}'},
     {'title': 'Expression', 'app': 'expression', 'href': f'{url_base_pathname}expression'},
     {'title': 'Download', 'app': 'download', 'href': f'{url_base_pathname}download'},
+    {'title': 'Merge', 'app': 'merge', 'href': f'{url_base_pathname}merge'},
 ]
 
 
@@ -46,6 +47,7 @@ app.layout = dbc.Container(
     Output({'type': 'navlink', 'page': MATCH}, 'active'),
     Input('url', 'pathname'),
     State({'type': 'navlink', 'page': MATCH}, 'href'),)
+
 def update_active_menu(pathname, page_href):
     return pathname == page_href
 
@@ -58,7 +60,6 @@ def display_page(pathname):
 
     for page in pages:
         if pathname == page['href']:
-
             page_app = getattr(apps, page["app"])
             menu = getattr(page_app, 'menu')
             body = getattr(page_app, 'body')
@@ -70,14 +71,4 @@ def display_page(pathname):
 
 
 if __name__ == '__main__':
-    import argparse
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--host', type=str, default='127.0.0.1')
-    parser.add_argument('--port', type=int, default=8050)
-    parser.add_argument('--debug', action='store_true')
-    
-    kvargs = vars(parser.parse_args())
-
-    app.run_server(**kvargs)
-
+    app.run_server(host="127.0.0.1", debug=True)

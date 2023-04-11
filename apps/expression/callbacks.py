@@ -1,23 +1,62 @@
-import dash_uploader as du
-from pathlib import Path
-import scanpy as sc
 import dash
-import pandas as pd
-from dash.dependencies import Input, Output, State
+import dash_uploader as du
+from dash import html, dcc, ctx, ALL, DiskcacheManager, CeleryManager
 import dash_bootstrap_components as dbc
+from dash.dependencies import Input, Output, State
+
 from app import app
-from dash import dcc, ctx
-from dash import html, ALL
-import plotly.express as px
-import plotly.graph_objects as go
 from skimage import io
-import json
-import matplotlib.pyplot as plt
+from pathlib import Path
 from zipfile import ZipFile
+
+import os
+import json
 import matplotlib
+import scanpy as sc
+import pandas as pd
+import plotly.express as px
+import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+
+"""
+    Configuration of background callbacks
+    
+    A DiskCache backend that runs callback logic in a separate process and stores the results to disk 
+    using the diskcache library.This is the easiest backend to use for local development, but is not 
+    recommended for production.
+    
+    A Celery backend that runs callback logic in a Celery worker and returns results to the Dash app 
+    through a Celery broker like Redis. This is recommended for production as, unlike Disk Cache, 
+    it queues the background callbacks, running them one-by-one in the order that they were received 
+    by dedicated Celery worker(s). Celery is a widely adopted, production-ready job queue library.
+"""
+if 'REDIS_URL' in os.environ:
+    # Use Redis & Celery if REDIS_URL set as an env variable
+    from celery import Celery
+    celery_app = Celery(__name__, broker=os.environ['REDIS_URL'], backend=os.environ['REDIS_URL'])
+    background_callback_manager = CeleryManager(celery_app)
+
+else:
+    # Diskcache for non-production apps when developing locally
+    import diskcache
+    cache = diskcache.Cache(r"./cache")
+    background_callback_manager = DiskcacheManager(cache)
+
+
 matplotlib.pyplot.switch_backend('Agg')
 UPLOAD_FOLDER_ROOT = r"Uploads"
 du.configure_upload(app, UPLOAD_FOLDER_ROOT)
+
+
+def write_adata(adata, adata_path):
+    """
+    Write the AnnData object to a file.
+
+    Args:
+        adata (AnnData): AnnData object to write.
+        adata_path (Path): Path of the file to write to.
+    """
+    adata.write(adata_path)
 
 @du.callback(
     [Output('adata-path', 'data'),
@@ -28,28 +67,185 @@ du.configure_upload(app, UPLOAD_FOLDER_ROOT)
     id='dash-uploader',
 )
 def get_adata(filename):
-    print(filename)
-    filename = filename[0]
-    if '\\' in filename:
-        filename = filename.replace('\\', '/')
-    foldarpath = filename.rsplit('/', 1)[0]
-    if filename.endswith('h5ad'):
-        adata = sc.read(filename)
-        adata.write(foldarpath+'/adata.h5ad')
-    elif filename.endswith('zip'):
-        with ZipFile(filename, 'r') as zip:
-            zip.extractall(foldarpath)
-        adata = sc.read_10x_mtx(
-            Path(filename.replace('.zip','')),
-            var_names='gene_symbols',
-            cache=False)
-        adata.write(foldarpath + '/adata.h5ad')
-    elif filename.endswith('h5'):
-        adata = sc.read_10x_h5(filename)
-        adata.write(foldarpath + '/adata.h5ad')
-    return foldarpath + '/adata.h5ad', filename.split('/')[1], {'display': 'block'}, True, 'Uploaded: '+filename.rsplit('/', 1)[1]
+    """
+        Callback function to get the path of the uploaded file, save it in H5AD format and return necessary outputs for the Dash app.
 
-@app.callback(
+        Args:
+            filename (str): The path of the uploaded file.
+
+        Returns:
+        tuple: A tuple of the following:
+            - (str) Path of the generated AnnData file.
+            - (str) session id.
+            - (dict) Display style for the preprocessing div.
+            - (bool) Boolean flag to disable the dash-uploader component.
+            - (str) Message to display when the dash-uploader component is disabled.
+    """
+    try:
+        filename = filename[0]
+        print('File uploaded in :',filename)
+        if '\\' in filename:
+            filename = filename.replace('\\', '/')
+        foldarpath = filename.rsplit('/', 1)[0]
+        if filename.endswith('h5ad'):
+            adata = sc.read(filename)
+        elif filename.endswith('zip'):
+            with ZipFile(filename, 'r') as zip:
+                name = zip.infolist()[0].filename
+                zip.extractall(foldarpath)
+            adata = sc.read_10x_mtx(
+                Path(foldarpath+'/'+name),
+                var_names='gene_symbols',
+                cache=False)
+        elif filename.endswith('h5'):
+            adata = sc.read_10x_h5(filename)
+        write_adata(adata,foldarpath + '/adata.h5ad')
+        return foldarpath + '/adata.h5ad', filename.split('/')[1], {'display': 'block'}, True, 'Uploaded: '+filename.rsplit('/', 1)[1]
+    except Exception as e:
+        print(f"Error occurred while processing file: {e}")
+        return None, None, {'display': 'none'}, False, 'Error: Please upload a valid file'
+
+def make_unique(adata):
+    """
+        Modifies the variable names in the input AnnData object to ensure uniqueness.
+
+        This function modifies the variable names in the input AnnData object to ensure that they are unique.
+        If any of the variable names are duplicates, a unique suffix will be appended to each name.
+
+        Parameters:
+            adata (anndata.AnnData): The input AnnData object.
+
+        Returns:
+            anndata.AnnData: The modified AnnData object with unique variable names.
+    """
+    print("Preprocessing annData file...")
+    adata.var_names_make_unique()
+    return adata
+
+
+def normalize_adata(adata):
+    """
+        Normalize the gene expression data in the input AnnData object.
+
+        This function normalizes the gene expression data in the input AnnData object by scaling the expression
+        levels of each cell so that they sum to a fixed value (1e4 by default). This scaling factor is applied
+        to all genes in each cell to correct for differences in sequencing depth between cells.
+
+        Parameters:
+            adata (anndata.AnnData): The input AnnData object.
+
+        Returns:
+            anndata.AnnData: The modified AnnData object with normalized gene expression data.
+    """
+    print("Normalize annData file...")
+    sc.pp.normalize_total(adata, target_sum=1e4)
+    return adata
+
+
+def logarithmize_total(adata):
+    """
+        Transform the gene expression data in the input AnnData object to logarithmic scale.
+
+        This function applies a natural logarithm transformation to the gene expression data in the input AnnData object.
+        This transformation is typically applied to gene expression data to convert it to a logarithmic scale, which can
+        make the data easier to work with and interpret.
+
+        Parameters:
+            adata (anndata.AnnData): The input AnnData object.
+
+        Returns:
+            anndata.AnnData: The modified AnnData object with logarithmically transformed gene expression data.
+    """
+    print("Logarithmize annData file...")
+    sc.pp.log1p(adata)
+    return adata
+
+
+def highly_variable_genes(adata):
+    """
+        Identify highly variable genes in the input AnnData object.
+
+        This function identifies the highly variable genes in the input AnnData object by calculating the mean expression
+        and the dispersion (variance/mean) for each gene across all cells. The genes that fall outside the specified
+        thresholds for mean expression and dispersion are considered highly variable and are marked as such in the
+        `var.highly_variable` attribute of the AnnData object.
+
+        Parameters:
+            adata (anndata.AnnData): The input AnnData object.
+
+        Returns:
+            anndata.AnnData: The modified AnnData object with identified highly variable genes.
+    """
+    print("Identify highly variable genes...")
+    sc.pp.highly_variable_genes(adata, min_mean=0.0125, max_mean=3, min_disp=0.5)
+    return adata
+
+
+def pca_adata(adata, svd_solver):
+    """
+        Perform principal component analysis (PCA) on the input AnnData object.
+
+        This function performs principal component analysis (PCA) on the gene expression data in the input AnnData object,
+        reducing the dimensionality of the data by identifying the major sources of variation across cells. The PCA
+        components are stored in the `obsm['X_pca']` attribute of the AnnData object.
+
+        Parameters:
+            adata (anndata.AnnData): The input AnnData object.
+            svd_solver (str, optional): The solver to use for calculating the PCA. Must be one of 'arpack' or 'svd'.
+                Defaults to 'arpack'.
+
+        Returns:
+            anndata.AnnData: The modified AnnData object with PCA components stored in `obsm['X_pca']`.
+    """
+    print("Perform principle component analysis...")
+    sc.tl.pca(adata, svd_solver=svd_solver)
+    return adata
+
+
+def compute_neighbors(adata, n_neighbors):
+    """
+        Compute nearest neighbors for the input AnnData object.
+
+        This function computes the nearest neighbors for each cell in the input AnnData object, based on the gene
+        expression similarity between cells. The nearest neighbor information is stored in the `uns['neighbors']`
+        attribute of the AnnData object.
+
+        Parameters:
+            adata (anndata.AnnData): The input AnnData object.
+            n_neighbors (int, optional): The number of neighbors to compute for each cell. Defaults to 10.
+
+        Returns:
+            anndata.AnnData: The modified AnnData object with computed nearest neighbor information.
+    """
+    print("Compute neighbors...")
+    sc.pp.neighbors(adata, n_neighbors=n_neighbors, knn=True, n_pcs=40)
+    return adata
+
+
+def umap_adata(adata, adata_path):
+    """
+        Compute UMAP embedding for the input AnnData object.
+
+        This function computes the Uniform Manifold Approximation and Projection (UMAP) embedding for the input AnnData
+        object, reducing the dimensionality of the data to two dimensions for visualization purposes. The UMAP
+        coordinates for each cell are stored in the `obsm['X_umap']` attribute of the AnnData object. Additionally, the
+        modified AnnData object is saved to the specified `adata_path`, and the UMAP coordinates are returned as a Pandas
+        DataFrame.
+
+        Parameters:
+            adata (anndata.AnnData): The input AnnData object.
+            adata_path (str): The file path to save the modified AnnData object.
+
+        Returns:
+            pandas.DataFrame: The UMAP coordinates for each cell in the input AnnData object.
+    """
+    print("Uniform Manifold Approximation and Projection for Dimension Reduction...")
+    sc.tl.umap(adata)
+    adata.write(adata_path)
+    obsmdf = adata.obsm.to_df()
+    return obsmdf
+
+@dash.callback(
     Output('genes', 'data'),
     Output('obsmdf', 'data'),
     Output('adata-div','style'),
@@ -60,40 +256,73 @@ def get_adata(filename):
     Input('preprocessing-button','n_clicks'),
     State('svd_solver','value'),
     State('n_neighbors','value'),
-    State('scatter-plot-div', 'children'))
-def preprocess_adata(adata_path, n, svd_solver, n_neighbors, children):
-    if n is None:
-        return dash.no_update
-    else:
-        adata = sc.read(adata_path)
-        print("Preprocessing annData file...")
-        adata.var_names_make_unique()
-        print("Normalize annData file...")
-        sc.pp.normalize_total(adata, target_sum=1e4)
-        print("Logarithmize annData file...")
-        sc.pp.log1p(adata)
-        sc.pp.highly_variable_genes(adata, min_mean=0.0125, max_mean=3, min_disp=0.5)
-        print("Perform principle component analysis...")
-        sc.tl.pca(adata, svd_solver=svd_solver)
-        print("Compute neighbors...")
-        sc.pp.neighbors(adata, n_neighbors=n_neighbors, knn=True, n_pcs=40)
-        print("Uniform Manifold Approximation and Projection for Dimension Reduction...")
-        sc.tl.umap(adata)
-        adata.write(adata_path)
-        obsmdf = adata.obsm.to_df()
-        genes = pd.DataFrame(adata.var.gene_ids)
-        gene_ids = genes['gene_ids'].to_numpy()
-    return genes.to_json(), obsmdf.to_json(), {'display': 'none'}, gene_ids, gene_ids[0], {'display': 'block'}
+    State('scatter-plot-div', 'children'),
+    background=True,
+    manager=background_callback_manager,
+    running=[
+        (Output("progress-text", "style"),  {'display': 'block'},  {'display': 'none'}),
+        (Output("adata-div-spinner", "style"),  {'display': 'block'},  {'display': 'none'}),
+    ],
+    progress=Output("progress-text", "children"),
+    prevent_initial_call=True)
+def preprocess_adata(set_progress, adata_path, n, svd_solver, n_neighbors, children):
+    try:
+        if n is None:
+            return dash.no_update
+        else:
+            adata = sc.read(adata_path)
+            genes = pd.DataFrame(adata.var.gene_ids)
+            gene_ids = genes['gene_ids'].to_numpy()
+            set_progress("Preprocessing annData file...")
+            adata = make_unique(adata)
+            set_progress("Normalize annData file...")
+            adata = normalize_adata(adata)
+            set_progress("Logarithmize annData file...")
+            adata = logarithmize_total(adata)
+            set_progress("Identify highly variable genes...")
+            adata = highly_variable_genes(adata)
+            set_progress("Perform principle component analysis...")
+            adata = pca_adata(adata, svd_solver)
+            set_progress("Compute neighbors...")
+            if n_neighbors:
+                adata = compute_neighbors(adata, n_neighbors)
+            else:
+                n_neighbors = 10
+                adata = compute_neighbors(adata, n_neighbors)
+            set_progress("Uniform Manifold Approximation and Projection for Dimension Reduction...")
+            obsmdf = umap_adata(adata, adata_path)
+            set_progress("Preprocessing Complete...")
+        return genes.to_json(), obsmdf.to_json(), {'display': 'none'}, gene_ids, gene_ids[0], {'display': 'block'}
+    except Exception as e:
+        print(f"Error occurred while preprocessing annData file: {e}")
+        set_progress(f"Error occurred while preprocessing annData file: {e}")
+        return None, None, {'display': 'none'}, [], '', {'display': 'none'}
 
 @app.callback(
     Output('2d3d-radio', 'style'),
-    Input('type', 'value'),)
-def update_2d3d_visibility(type):
-    if type == 'PCA':
-        style = {'display': 'block'}
-    else:
-        style = {'display': 'none'}
-    return style
+    Input('type', 'value'),
+)
+def update_2d3d_visibility(value):
+    """
+        Updates the visibility style of the 2D/3D radio button based on the selected value of the "type" dropdown.
+
+        Args:
+            value (str): The selected value of the "type" dropdown.
+
+        Returns:
+            dict: A dictionary with the style to be applied to the 2D/3D radio button.
+    """
+    try:
+        if value == 'PCA':
+            style = {'display': 'block'}
+        else:
+            style = {'display': 'none'}
+        return style
+    except Exception as e:
+        print(f"Error in update_2d3d_visibility: {e}")
+        return {'display': 'none'}
+
+
 
 @app.callback([Output('expression-graph', 'figure'),
               Output('cluster-option-div', 'style'),
@@ -324,6 +553,7 @@ def differential_gene_download(adata_path,clustertype, n, clustername, grouplen)
 
 @app.callback(
     Output('manual-cluster-div','style'),
+    Output('manual-cluster-div-spinner','spinner_style'),
     Input('manual-cluster-button','n_clicks'),
     Input('compare-button','n_clicks'),
     Input('plot-button', 'n_clicks'),)
@@ -331,7 +561,7 @@ def manual_clustering(n, compare, plot_button):
     if ctx.triggered_id == 'compare-button' or ctx.triggered_id == 'plot-button':
         return {'display': 'none'}
     elif ctx.triggered_id == 'manual-cluster-button':
-        return {'display': 'block'}
+        return {'display': 'block'},{'display': 'block'}
     else:
         return dash.no_update
 
@@ -360,9 +590,13 @@ def display_dropdowns(n_clicks, children):
     Input({'type': 'ok-button','index': ALL}, 'n_clicks'),
     State({'type': 'cluster-name','index': ALL}, 'value'),
     State('type','value'),
+    Input('plot-button', 'n_clicks'),
 )
-def display_output(manual_cluster_dict,obsmdf, selectedData,n_clicks, clustername, type):
+def display_output(manual_cluster_dict,obsmdf, selectedData, n_clicks, clustername, type, scatter_plot):
     if not any(None in trigg.values() for trigg in ctx.triggered):
+        if (ctx.triggered_id == 'plot-button'):
+            manual_cluster_dict = {}
+            return manual_cluster_dict
         clusterCategory = pd.Series(data=(str(x) for x in clustername), dtype='category')
         obsmdf = pd.read_json(obsmdf)
         if manual_cluster_dict == None:
