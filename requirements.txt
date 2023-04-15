@@ -16,3 +16,4 @@ uuid
 gunicorn
 packaging==21.3
 "dash[diskcache]"
+scbean

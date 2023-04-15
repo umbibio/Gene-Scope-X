@@ -66,7 +66,7 @@ def write_adata(adata, adata_path):
     Output('dash-uploader','disabledMessage')],
     id='dash-uploader',
 )
-def get_adata(filename):
+def get_adata(status: du.UploadStatus):
     """
         Callback function to get the path of the uploaded file, save it in H5AD format and return necessary outputs for the Dash app.
 
@@ -82,25 +82,25 @@ def get_adata(filename):
             - (str) Message to display when the dash-uploader component is disabled.
     """
     try:
-        filename = filename[0]
+        filename = str(status.uploaded_files[0])
         print('File uploaded in :',filename)
         if '\\' in filename:
             filename = filename.replace('\\', '/')
-        foldarpath = filename.rsplit('/', 1)[0]
+        folderpath = filename.rsplit('/', 1)[0]
         if filename.endswith('h5ad'):
             adata = sc.read(filename)
         elif filename.endswith('zip'):
             with ZipFile(filename, 'r') as zip:
                 name = zip.infolist()[0].filename
-                zip.extractall(foldarpath)
+                zip.extractall(folderpath)
             adata = sc.read_10x_mtx(
-                Path(foldarpath+'/'+name),
+                Path(folderpath+'/'+name),
                 var_names='gene_symbols',
                 cache=False)
         elif filename.endswith('h5'):
             adata = sc.read_10x_h5(filename)
-        write_adata(adata,foldarpath + '/adata.h5ad')
-        return foldarpath + '/adata.h5ad', filename.split('/')[1], {'display': 'block'}, True, 'Uploaded: '+filename.rsplit('/', 1)[1]
+        write_adata(adata,folderpath + '/adata.h5ad')
+        return folderpath + '/adata.h5ad', filename.split('/')[1], {'display': 'block'}, True, 'Uploaded: '+filename.rsplit('/', 1)[1]
     except Exception as e:
         print(f"Error occurred while processing file: {e}")
         return None, None, {'display': 'none'}, False, 'Error: Please upload a valid file'

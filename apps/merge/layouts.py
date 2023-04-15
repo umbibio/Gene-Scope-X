@@ -17,6 +17,7 @@ def get_upload_component(id):
 
 menu = None
 body = [
+    dcc.Store(id='merge-file-path'),
     dbc.Row(dbc.Col(
         dbc.Card([
             dbc.CardHeader(html.H2("Merge Multiple 10x Genomic Files")),
