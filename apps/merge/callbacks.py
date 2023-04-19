@@ -38,7 +38,7 @@ else:
     background_callback_manager = DiskcacheManager(cache)
 
 @du.callback(
-    [Output('uploaded-files', 'data')],
+    Output('uploaded-files', 'data'),
     id="merge-uploader",
 )
 def upload_files(status: du.UploadStatus):
