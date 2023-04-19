@@ -13,10 +13,12 @@ def get_upload_component(id):
         filetypes=['h5ad', 'zip', 'h5'],
         upload_id=uuid.uuid4(),  # Unique session id
         max_files=5,
+        default_style = {'min-height': '150px'}
     )
 
 menu = None
 body = [
+    dcc.Store(id='uploaded-files'),
     dcc.Store(id='merge-file-path'),
     dbc.Row(dbc.Col(
         dbc.Card([
@@ -34,7 +36,9 @@ body = [
             dbc.CardBody(
                 dbc.Row([
                     dbc.Col([get_upload_component(id='merge-uploader'),
-                             html.Div(id='callback-output'),]),
+                             html.Br(),
+                             html.Button("Merge files", id="merge-button"),
+                             dbc.Progress(id="merge-progress-bar", value="0", label="", style={'display': 'none'}),]),
                     dbc.Col([html.Button("Download merged h5ad file", id="download-merge-button"),
                              dcc.Download(id="download-merge")]),
                 ])
