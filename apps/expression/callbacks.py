@@ -322,6 +322,7 @@ def preprocess_adata(set_progress, adata_path, n, svd_solver, n_neighbors, child
 @app.callback(
     Output('2d3d-radio', 'style'),
     Input('type', 'value'),
+    prevent_initial_call=True
 )
 def update_2d3d_visibility(value):
     """
@@ -495,7 +496,8 @@ def manual_clustering(n):
 @app.callback(
     Output('cluster-container', 'children'),
     Input('add-cluster', 'n_clicks'),
-    State('cluster-container', 'children'))
+    State('cluster-container', 'children'),
+    prevent_initial_call=True)
 def display_added_cluster(n_clicks, children):
     """
         Display a ok button and input field when the "Add Cluster" button is clicked.
@@ -537,6 +539,7 @@ def display_added_cluster(n_clicks, children):
         (Output("manual-progress-text", "style"), {'display': 'block'}, {'display': 'none'})
     ],
     progress=Output("manual-progress-text", "children"),
+    prevent_initial_call=True
 )
 def add_data_to_dict(set_progress,n, manual_cluster_dict, obsmdf, selectedData, clustername, type):
     """
@@ -631,7 +634,8 @@ def manual_scatter_plot(n, adata_path, session_id, type, manual_cluster_dict):
               State('adata-path', 'data'),
               State('clustertype', 'data'),
               State({'type': 'cluster-name', 'index': ALL}, 'value'),
-              State('grouplen', 'data'), )
+              State('grouplen', 'data'), 
+              prevent_initial_call=True)
 def differential_gene_download(n,adata_path, clustertype, clustername, grouplen):
     """
     Callback function for downloading differential gene expression data as a CSV file.

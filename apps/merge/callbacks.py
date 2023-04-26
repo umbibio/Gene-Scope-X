@@ -38,7 +38,8 @@ else:
     background_callback_manager = DiskcacheManager(cache)
 
 @du.callback(
-    Output('uploaded-files', 'data'),
+    [Output('uploaded-files', 'data'),
+    Output('merge-button','disabled')],
     id="merge-uploader",
 )
 def upload_files(status: du.UploadStatus):
@@ -59,14 +60,15 @@ def upload_files(status: du.UploadStatus):
             uploaded_files={'uploaded_files':[]}
             for filename in status.uploaded_files:
                 uploaded_files['uploaded_files'].append(str(filename))
-            return uploaded_files
+            return uploaded_files, False
     except Exception as e:
         print(f"Error occurred while uploading file: {e}")
-        return uploaded_files
+        return uploaded_files, True
 
 
 @app.callback(
     Output('merge-file-path', 'data'),
+    Output('download-merge-button','disabled'),
     Input('merge-button', 'n_clicks'),
     State('uploaded-files','data'),
     background=True,
@@ -75,6 +77,7 @@ def upload_files(status: du.UploadStatus):
         (Output("merge-progress-bar", "style"),{"visibility": "visible"},{"visibility": "hidden"},),
     ],
     progress=[Output("merge-progress-bar", "value"), Output("merge-progress-bar", "max"), Output("merge-progress-bar", "label")],
+    prevent_initial_call=True
 )
 def merge_adata(set_progress,n, uploaded_files):
     """
@@ -137,14 +140,15 @@ def merge_adata(set_progress,n, uploaded_files):
             print(adata_integrate)
             adata_integrate.write(foldarpath+'/integrated_adata.h5ad')
             set_progress(((str(10), str(10), str("Completed..."))))
-            return foldarpath+'/integrated_adata.h5ad'
+            return foldarpath+'/integrated_adata.h5ad', False
         except Exception as e:
             print(f"Error in merge_adata: {e}")
-            return ''
+            return '', True
 
 @app.callback(Output("download-merge", "data"),
               Input('download-merge-button','n_clicks'),
-              State('merge-file-path', 'data'),)
+              State('merge-file-path', 'data'),
+              prevent_initial_call=True)
 def download_merged_anndata(n,merge_file_path):
     """
     Downloads the merged AnnData file when the download button is clicked.

@@ -22,10 +22,11 @@ def get_upload_component(id):
 
 menu = [
     html.Div([dbc.Spinner([html.Div(id='adata-div', children=[get_upload_component(id='dash-uploader'), 
-              html.P(['The supported file formats are:',html.Br(),
-              '* h5ad file',html.Br(),
-              '* h5 file',html.Br(),
-              '* zip file compressing the folder containing matrix, features and barcode files'], id='supported-file'),
+              dcc.Markdown('''
+The supported file formats are:
+* h5ad file
+* h5 file
+* zip file compressing the folder containing matrix, features and barcode files''', id='supported-file'),
               html.Div(id='preprocessing-div', children=[
                   html.Br(),
                   html.P("PCA"),

@@ -11,37 +11,39 @@ body = [
             dbc.CardBody(
                 dbc.Row([
                     dbc.Col(dcc.Markdown('''
-GeneScopeX is a web application that provides a comprehensive and user-friendly interface for analyzing single-cell gene expression data using the scanpy library. The application takes anndata, performs preprocessing, displays PCA and map data, facilitates manual and automatic clustering, and performs differential gene expression analysis. Additionally, GeneScopeX provides a wide range of visualization options like dendrogram, violin plot, heat map, matrix plot, and more, enabling users to gain deep insights into their data.
+GeneScopeX is a web application that provides a comprehensive and user-friendly interface for analyzing single-cell gene expression data using the scanpy library. To explore the data click on one of the tabs above.
 
-The application is designed to be highly flexible and adaptable, allowing users to customize their analysis and visualization workflows to fit their specific research needs. With GeneScopeX, researchers can quickly and easily visualize and analyze gene expression patterns across different cell types, identify differentially expressed genes, perform clustering and dimensionality reduction, and explore complex relationships within their data.
-
-Overall, GeneScopeX is an all-in-one solution for single-cell analysis that combines powerful data processing and analysis tools with intuitive visualization options, making it an ideal choice for researchers and analysts working with large-scale single-cell gene expression datasets.
+1. **Expression**: Explore expression of genes projected on PCA or UMAP coordinates, perform clustering, identify differentially expressed genes and visualize the representation on various plots.
+2. **Download**: Provides various formats of sample files to download and run the expression.
+3. **Merge**: Merges multiple 10x Genomic files into a single file and download the resulting h5ad file to run the expression.
 ''')),
-                # dbc.Col(
-                #     dbc.Carousel(items=[
-                #         {"key": "1", "src": "/babesiasc/assets/newplot-expression.png"},
-                #         {"key": "2", "src": "/babesiasc/assets/newplot-pstime.png"},
-                #         {"key": "3", "src": "/babesiasc/assets/network-graph.png"},
-                #     ], interval=5000, className="carousel-fade", indicators=False)
-                # )
+                dbc.Col(
+                    dbc.Carousel(items=[
+                        {"key": "1", "src": "assets/newplot-scatter.png"},
+                        {"key": "2", "src": "assets/newplot-clustering.png"},
+                        {"key": "3", "src": "assets/newplot-heatmap.png"},
+                    ], interval=5000, className="carousel-fade", indicators=False)
+                )
                 ])),
         ],),
     ), class_name="mb-4 mt-4"),
     dbc.Row([
-#         dbc.Col(dbc.Card([
-#             dbc.CardHeader(html.H4("Citation")),
-#             dbc.CardBody(dcc.Markdown('''
-# Yasaman Rezvani*, Caroline D Keroack*, Brendan Elsworth, Argenis Arriojas, Marc-Jan Gubbels, Manoj T Duraisingh, Kourosh Zarringhalam, "Single cell transcriptional atlas of Babesia species reveals coordinated progression of transcriptomes and identifies conserved and species-specific transcriptional profiles", 2022, BioRxiv
-# ''')),
-#         ],),),
+        dbc.Col(dbc.Card([
+            dbc.CardHeader(html.H4("Citation")),
+            dbc.CardBody(dcc.Markdown('''
+Jialu Hu1, Mengjie Chen2, and Xiang Zhou, "Effective and scalable single-cell data alignment with non-linear canonical correlation analysis", 2021
+
+F. Alexander Wolf, Philipp Angerer & Fabian J. Theis, "SCANPY: large-scale single-cell gene expression data analysis",2018
+''')),
+        ],),),
         dbc.Col(dbc.Card([
             dbc.CardHeader(html.H4("Contact")),
             dbc.CardBody(dcc.Markdown('''
 For questions or comments please contact:
 
-Kourosh.Zarringhalam at umb dot edu
+Divya.Thota at umb dot edu
 
-Kourosh.Zarringhalam@umb.edu
+Divya.Thota@umb.edu
 ''')),
         ],),),
     ]),
