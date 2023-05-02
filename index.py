@@ -26,7 +26,7 @@ nav = dbc.Nav([
     dbc.NavItem(dbc.NavLink(page['title'], href=page['href'], id={'type': 'navlink', 'page': page['app']}))
     for page in pages ], pills=True)
 
-logo = html.Img(src=app.get_asset_url('logo.png'), className="img-fluid")
+logo = html.Img(src=app.get_asset_url('images/logo.png'), className="img-fluid")
 
 app.layout = dbc.Container(
     dbc.Row([
