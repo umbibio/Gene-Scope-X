@@ -3,6 +3,7 @@ GeneScopeX is a web application that provides a comprehensive and user-friendly 
 
 ## Technologies Used
 The application is built using the following technologies:
+
 Python: as the main programming language
 Dash: as the web framework for building the user interface
 Plotly: as the visualization library for generating interactive plots and charts
