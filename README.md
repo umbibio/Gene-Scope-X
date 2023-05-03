@@ -4,14 +4,14 @@ GeneScopeX is a web application that provides a comprehensive and user-friendly 
 ## Technologies Used
 The application is built using the following technologies:
 
-Python: as the main programming language
-Dash: as the web framework for building the user interface
-Plotly: as the visualization library for generating interactive plots and charts
-AnnData: as the data structure for storing and manipulating 10x Genomics data
-Scanpy: as the library for preprocessing, clustering, and differential gene analysis
-Flask: as the underlying web server for serving the Dash application
-Gunicorn: as the WSGI HTTP server for deploying the Flask application
-Vipcca: as the library to merge multiple 10x Genomic files.
+Python: as the main programming language.<br />
+Dash: as the web framework for building the user interface.<br />
+Plotly: as the visualization library for generating interactive plots and charts.<br />
+AnnData: as the data structure for storing and manipulating 10x Genomics data.<br />
+Scanpy: as the library for preprocessing, clustering, and differential gene analysis.<br />
+Flask: as the underlying web server for serving the Dash application.<br />
+Gunicorn: as the WSGI HTTP server for deploying the Flask application.<br />
+Vipcca: as the library to merge multiple 10x Genomic files.<br />
 GitHub: as the version control system for managing the source code and collaboration.
 
 ## Installation Steps
