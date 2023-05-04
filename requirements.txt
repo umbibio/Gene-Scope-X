@@ -1,5 +1,5 @@
 dash
-dash_uploader==0.6.0
+dash_uploader==0.7.0a1
 dash_bootstrap_components
 dash_bootstrap_templates
 numpy
@@ -15,3 +15,5 @@ pathlib
 uuid
 gunicorn
 packaging==21.3
+"dash[diskcache]"
+scbean
