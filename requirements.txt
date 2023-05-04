@@ -1,4 +1,4 @@
-dash
+dash[diskcache,celery]
 dash_uploader==0.7.0a1
 dash_bootstrap_components
 dash_bootstrap_templates
